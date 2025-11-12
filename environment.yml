@@ -1,0 +1,31 @@
+name: aivisual
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.11
+  - pip
+  - numpy>=1.26.4
+  - pytorch==2.8.0
+  - torchvision==0.13.0
+  - torchaudio==2.0.0
+  - cudatoolkit=12.8
+  - pip:
+    - timm>=1.0.14
+    - albumentations>=2.0.4
+    - onnx>=1.14.0
+    - onnxruntime>=1.15.1
+    - pycocotools>=2.0.7
+    - PyYAML>=6.0.1
+    - scipy>=1.13.0
+    - onnxslim>=0.1.31
+    - onnxruntime-gpu>=1.18.0
+    - gradio>=4.44.1
+    - opencv-python>=4.9.0.80
+    - psutil>=5.9.8
+    - py-cpuinfo>=9.0.0
+    - huggingface-hub>=0.23.2
+    - safetensors>=0.4.3
+    - supervision>=0.22.0
+    - lap>=0.5.12
