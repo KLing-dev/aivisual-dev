@@ -30,7 +30,8 @@ class LeaveDetector:
         self.model.to(device)
 
         # 设置检测类别为人员
-        self.model.set_classes(["person"])
+        if hasattr(self.model, 'set_classes'):
+            self.model.set_classes(["person"])
 
         self.device = device
 
