@@ -84,12 +84,23 @@ const DetectionPage = () => {
       label: '横幅检测',
       parameters: [
         {
-          name: 'banner_confidence',
-          label: '横幅检测置信度阈值',
+          name: 'banner_conf_threshold',
+          label: '置信度阈值',
           type: 'number',
-          default: 0.5,
-          min: 0,
-          max: 1,
+          default: 0.3,
+          min: 0.1,
+          max: 1.0,
+          step: 0.1,
+          unit: ''
+        },
+        {
+          name: 'banner_iou_threshold',
+          label: 'IoU阈值',
+          type: 'number',
+          default: 0.45,
+          min: 0.1,
+          max: 1.0,
+          step: 0.1,
           unit: ''
         }
       ]
