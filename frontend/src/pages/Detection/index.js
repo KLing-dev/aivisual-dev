@@ -78,6 +78,21 @@ const DetectionPage = () => {
           unit: '秒'
         }
       ]
+    },
+    {
+      value: 'banner',
+      label: '横幅检测',
+      parameters: [
+        {
+          name: 'banner_confidence',
+          label: '横幅检测置信度阈值',
+          type: 'number',
+          default: 0.5,
+          min: 0,
+          max: 1,
+          unit: ''
+        }
+      ]
     }
   ];
 
