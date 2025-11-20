@@ -12,28 +12,31 @@ import torch
 
 
 class LeaveDetector:
-    def __init__(self, model_path="yolov12/yolov12n.pt", device='cuda'):
+    def __init__(self, model_path="yolov12/yolov12n.pt", device='cuda', img_size=640):
         """
         初始化离岗检测器
 
         Args:
             model_path (str): YOLOv12模型路径
             device (str): 运行设备 ('cuda' 或 'cpu')
+            img_size (int): 图像处理尺寸（较小的尺寸可以提高速度）
         """
         # 检查设备可用性
         if device == 'cuda' and not torch.cuda.is_available():
             print("CUDA is not available, falling back to CPU")
             device = 'cpu'
 
-        # 加载YOLOv12模型
-        self.model = YOLO(model_path)
-        self.model.to(device)
+        # 使用 YOLOModelManager 加载模型
+        from api.models.yolo_models import YOLOModelManager
+        model_manager = YOLOModelManager(model_dir=os.path.dirname(model_path) or "yolov12")
+        self.model = model_manager.load_model(os.path.basename(model_path), device)
+        self.device = device
 
         # 设置检测类别为人员
         if hasattr(self.model, 'set_classes'):
             self.model.set_classes(["person"])
 
-        self.device = device
+        self.img_size = img_size
 
     def point_in_roi(self, point, roi):
         """
