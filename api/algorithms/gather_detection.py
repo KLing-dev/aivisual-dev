@@ -84,22 +84,23 @@ class GatherDetector:
         logger.info(f"YOLO检测结果: 检测到 {len(results[0].boxes)} 个目标")
 
         person_boxes = []
+        roi_person_boxes = []  # 仅存储ROI区域内的人员框
         for box in results[0].boxes:
             cls = int(box.cls[0])
             if cls == 0:  # 只处理人员类别
-                person_boxes.append(box.xyxy.cpu().numpy()[0])
+                box_coords = box.xyxy.cpu().numpy()[0]
+                person_boxes.append(box_coords)
+                # 检查该人员是否在ROI区域内
+                x1, y1, x2, y2 = box_coords.astype(int)
+                center = ((x1 + x2) // 2, (y1 + y2) // 2)
+                if self.point_in_roi(center, roi):
+                    roi_person_boxes.append(box_coords)
 
         logger.info(f"检测到人员数量: {len(person_boxes)}")
+        logger.info(f"ROI内人员数量: {len(roi_person_boxes)}")
 
-        # 统计ROI内人数
-        roi_person_count = 0
-        for box in person_boxes:
-            x1, y1, x2, y2 = box.astype(int)
-            center = ((x1 + x2) // 2, (y1 + y2) // 2)
-            if self.point_in_roi(center, roi):
-                roi_person_count += 1
-
-        logger.info(f"ROI内人数: {roi_person_count}")
+        # ROI内人数
+        roi_person_count = len(roi_person_boxes)
 
         # 判断是否触发聚集警报
         alert_triggered = roi_person_count >= gather_threshold
@@ -109,5 +110,6 @@ class GatherDetector:
         return {
             'roi_person_count': roi_person_count,
             'alert_triggered': alert_triggered,
-            'person_boxes': person_boxes
+            'person_boxes': person_boxes,  # 所有检测到的人员框
+            'roi_person_boxes': roi_person_boxes  # 仅ROI区域内的人员框
         }

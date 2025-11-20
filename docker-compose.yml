@@ -5,12 +5,50 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+    image: cv-backend:latest  # 添加固定镜像名
     ports:
       - "8000:8000"
     volumes:
       - ./api/uploads:/app/api/uploads
       - ./api/processed_videos:/app/api/processed_videos
       - ./api/alerts:/app/api/alerts  # 报警信息存储目录
+    environment:
+      - PYTHONPATH=/app
+
+  backend-x86:  # 添加x86专用服务
+    build:
+      context: .
+      dockerfile: Dockerfile.backend-x86
+    image: cv-backend-x86:latest
+    platform: linux/amd64  # 指定平台
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api/uploads:/app/api/uploads
+      - ./api/processed_videos:/app/api/processed_videos
+      - ./api/alerts:/app/api/alerts
+    environment:
+      - PYTHONPATH=/app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  backend-arm64:  # ARM64专用服务
+    build:
+      context: .
+      dockerfile: Dockerfile.backend-arm64
+    image: cv-backend-arm64:latest
+    platform: linux/arm64  # 指定平台
+    ports:
+      - "8001:8000"  # 使用不同端口避免冲突
+    volumes:
+      - ./api/uploads:/app/api/uploads
+      - ./api/processed_videos:/app/api/processed_videos
+      - ./api/alerts:/app/api/alerts
     environment:
       - PYTHONPATH=/app
 

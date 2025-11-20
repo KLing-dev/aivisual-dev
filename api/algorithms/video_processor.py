@@ -17,6 +17,7 @@ from .banner_detection import BannerDetector
 # 中文显示支持
 try:
     from PIL import Image, ImageDraw, ImageFont
+
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
@@ -81,16 +82,16 @@ class VideoProcessor:
             BannerDetector: 横幅检测器实例
         """
         return BannerDetector(
-            model_path=self.model_path,
+            model_path=None,  # 横幅检测使用专用的banner_weight.pt模型
             conf_threshold=conf_threshold,
             iou_threshold=iou_threshold
         )
 
     def process_loitering_video(self,
-                               video_path: str,
-                               output_path: str,
-                               loitering_time_threshold: int = 20,
-                               device: str = 'cuda') -> str:
+                                video_path: str,
+                                output_path: str,
+                                loitering_time_threshold: int = 20,
+                                device: str = 'cuda') -> str:
         """
         处理徘徊检测视频
 
@@ -148,99 +149,12 @@ class VideoProcessor:
 
         return output_path
 
-    def process_banner_video(self,
-                           video_path: str,
-                           output_path: str,
-                           conf_threshold: float = 0.3,
-                           iou_threshold: float = 0.45,
-                           device: str = 'cuda') -> str:
-        """
-        处理横幅检测视频
-
-        Args:
-            video_path: 输入视频路径
-            output_path: 输出视频路径
-            conf_threshold: 置信度阈值
-            iou_threshold: NMS IoU阈值
-            device: 运行设备
-
-        Returns:
-            str: 处理后的视频路径
-        """
-        print(f"开始横幅检测处理: {video_path}")
-        print(f"输出路径: {output_path}")
-
-        # 初始化检测器
-        print("初始化BannerDetector...")
-        # 横幅检测使用专用的banner_model.pt模型，不传递model_path参数
-        detector = BannerDetector(
-            conf_threshold=conf_threshold,
-            iou_threshold=iou_threshold,
-            device=device
-        )
-        print("BannerDetector初始化完成")
-
-        # 打开视频文件
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            raise Exception(f"无法打开视频文件: {video_path}")
-
-        # 获取视频参数
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-        print(f"视频信息: {width}x{height}, {fps}fps, {total_frames}帧")
-
-        # 初始化视频写入器
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-
-        frame_count = 0
-        total_banners = 0
-
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            frame_count += 1
-            if frame_count % 30 == 0:  # 每30帧输出一次进度
-                print(f"处理进度: {frame_count}/{total_frames} 帧")
-
-            # 执行横幅检测
-            results, banners = detector.detect_banner(frame)
-
-            # 调试输出
-            if banners:
-                print(f"第{frame_count}帧检测到 {len(banners)} 个横幅")
-                for i, banner in enumerate(banners):
-                    print(f"  横幅{i+1}: 类别={banner['class']}, 置信度={banner['confidence']:.2f}, "
-                          f"位置={banner['box']}, 宽高比={banner.get('aspect_ratio', 0):.2f}")
-                total_banners += len(banners)
-
-            # 在帧上绘制检测结果
-            annotated_frame = self._draw_banner_detections(frame, banners)
-
-            # 写入处理后的帧
-            out.write(annotated_frame)
-
-        # 释放资源
-        cap.release()
-        out.release()
-
-        print(f"横幅检测处理完成!")
-        print(f"总帧数: {frame_count}, 检测到横幅的总次数: {total_banners}")
-
-        return output_path
-
     def process_leave_video(self,
-                           video_path: str,
-                           output_path: str,
-                           roi: Optional[List[Tuple[int, int]]] = None,
-                           absence_threshold: int = 5,
-                           device: str = 'cuda') -> str:
+                            video_path: str,
+                            output_path: str,
+                            roi: Optional[List[Tuple[int, int]]] = None,
+                            absence_threshold: int = 5,
+                            device: str = 'cuda') -> str:
         """
         处理离岗检测视频
 
@@ -288,18 +202,8 @@ class VideoProcessor:
             frame_count += 1
             frame_time = frame_count / fps
 
-            # 调整图像尺寸以提高处理速度
-            h, w = frame.shape[:2]
-            scale = detector.img_size / max(h, w) if hasattr(detector, 'img_size') else 1
-            if scale < 1:
-                new_w, new_h = int(w * scale), int(h * scale)
-                processed_frame = cv2.resize(frame, (new_w, new_h))
-            else:
-                processed_frame = frame
-                scale = 1
-
-            # 执行离岗检测
-            result = detector.detect_leave(processed_frame, roi, absence_start_time, absence_threshold)
+            # 直接在原始帧上执行离岗检测，不进行缩放
+            result = detector.detect_leave(frame, roi, absence_start_time, absence_threshold)
             absence_start_time = result['absence_start_time']
 
             # 在帧上绘制检测结果
@@ -323,11 +227,11 @@ class VideoProcessor:
         return output_path
 
     def process_gather_video(self,
-                            video_path: str,
-                            output_path: str,
-                            roi: Optional[List[Tuple[int, int]]] = None,
-                            gather_threshold: int = 5,
-                            device: str = 'cuda') -> str:
+                             video_path: str,
+                             output_path: str,
+                             roi: Optional[List[Tuple[int, int]]] = None,
+                             gather_threshold: int = 5,
+                             device: str = 'cuda') -> str:
         """
         处理聚集检测视频
 
@@ -371,26 +275,16 @@ class VideoProcessor:
             frame_count += 1
             frame_time = frame_count / fps
 
-            # 调整图像尺寸以提高处理速度
-            h, w = frame.shape[:2]
-            scale = detector.img_size / max(h, w) if hasattr(detector, 'img_size') else 1
-            if scale < 1:
-                new_w, new_h = int(w * scale), int(h * scale)
-                processed_frame = cv2.resize(frame, (new_w, new_h))
-            else:
-                processed_frame = frame
-                scale = 1
-
-            # 执行聚集检测
-            result = detector.detect_gather(processed_frame, roi, gather_threshold)
+            # 直接在原始帧上执行聚集检测，不进行缩放
+            result = detector.detect_gather(frame, roi, gather_threshold)
 
             # 在帧上绘制检测结果
             annotated_frame = self._draw_gather_detections(
                 frame, roi, result['roi_person_count'], gather_threshold, result['alert_triggered']
             )
 
-            # 绘制检测到的人员框
-            for box in result['person_boxes']:
+            # 绘制检测到的人员框（仅ROI区域内的人员框）
+            for box in result['roi_person_boxes']:
                 x1, y1, x2, y2 = box.astype(int)
                 cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
@@ -400,6 +294,95 @@ class VideoProcessor:
         # 释放资源
         cap.release()
         out.release()
+
+        return output_path
+
+    def process_banner_video(self,
+                             video_path: str,
+                             output_path: str,
+                             roi: Optional[List[Tuple[int, int]]] = None,
+                             conf_threshold: float = 0.3,
+                             iou_threshold: float = 0.45,
+                             device: str = 'cuda') -> str:
+        """
+        处理横幅检测视频
+
+        Args:
+            video_path: 输入视频路径
+            output_path: 输出视频路径
+            roi: ROI区域 [(x1, y1), (x2, y2), ...]
+            conf_threshold: 置信度阈值
+            iou_threshold: NMS IoU阈值
+            device: 运行设备
+
+        Returns:
+            str: 处理后的视频路径
+        """
+        print(f"开始横幅检测处理: {video_path}")
+        print(f"输出路径: {output_path}")
+
+        # 初始化检测器
+        print("初始化BannerDetector...")
+        detector = BannerDetector(
+            model_path=None,  # 横幅检测使用专用的banner_weight.pt模型
+            conf_threshold=conf_threshold,
+            iou_threshold=iou_threshold,
+            device=device
+        )
+        print("BannerDetector初始化完成")
+
+        # 打开视频文件
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise Exception(f"无法打开视频文件: {video_path}")
+
+        # 获取视频参数
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        print(f"视频信息: {width}x{height}, {fps}fps, {total_frames}帧")
+
+        # 初始化视频写入器
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+        frame_count = 0
+        total_banners = 0
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            frame_count += 1
+            if frame_count % 30 == 0:  # 每30帧输出一次进度
+                print(f"处理进度: {frame_count}/{total_frames} 帧")
+
+            # 执行横幅检测
+            results, banners = detector.detect_banner(frame)
+
+            # 调试输出
+            if banners:
+                print(f"第{frame_count}帧检测到 {len(banners)} 个横幅")
+                for i, banner in enumerate(banners):
+                    print(f"  横幅{i + 1}: 类别={banner['class']}, 置信度={banner['confidence']:.2f}, "
+                          f"位置={banner['box']}, 宽高比={banner.get('aspect_ratio', 0):.2f}")
+                total_banners += len(banners)
+
+            # 在帧上绘制检测结果
+            annotated_frame = self._draw_banner_detections(frame, banners)
+
+            # 写入处理后的帧
+            out.write(annotated_frame)
+
+        # 释放资源
+        cap.release()
+        out.release()
+
+        print(f"横幅检测处理完成!")
+        print(f"总帧数: {frame_count}, 检测到横幅的总次数: {total_banners}")
 
         return output_path
 
@@ -415,19 +398,19 @@ class VideoProcessor:
 
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(frame, f"{class_name}: {confidence:.2f}",
-                       (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
         # 绘制警报
         for obj_id, alarm in alarms.items():
             x1, y1, x2, y2 = map(int, alarm['position'])
             duration = alarm['duration']
             cv2.putText(frame, f"Loitering: {duration:.1f}s",
-                       (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                        (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
         return frame
 
     def _draw_leave_detections(self, frame, roi, status, person_count,
-                              absence_start_time, absence_threshold, alert_triggered):
+                               absence_start_time, absence_threshold, alert_triggered):
         """
         在帧上绘制离岗检测结果
         """
@@ -475,16 +458,16 @@ class VideoProcessor:
             # 如果PIL不可用，使用英文替代
             color = (0, 255, 0) if status == "在岗" else (0, 0, 255)
             cv2.putText(frame, f"Status: {status}", (30, 50),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
             if absence_start_time is not None:
                 absence_duration = (datetime.now() - absence_start_time).total_seconds()
                 cv2.putText(frame, f"Absence: {absence_duration:.1f}s", (30, 100),
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
             if alert_triggered:
                 cv2.putText(frame, "WARNING: Person Left!", (frame.shape[1] // 2 - 150, 50),
-                           cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
 
         return frame
 
@@ -529,11 +512,11 @@ class VideoProcessor:
         else:
             # 如果PIL不可用，使用英文替代
             cv2.putText(frame, f"ROI Persons: {person_count}", (30, 50),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
             if alert_triggered:
                 cv2.putText(frame, "WARNING: Crowd Detected!", (30, 100),
-                           cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
 
         return frame
 
@@ -541,7 +524,7 @@ class VideoProcessor:
         """
         在帧上绘制横幅检测结果
         """
-        # 绘制检测框
+        # 绘制检测框（完全按照bannerdetect.py的方式）
         for banner in banners:
             x1, y1, x2, y2 = banner['box']
             conf = banner['confidence']
@@ -551,7 +534,12 @@ class VideoProcessor:
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
             # 绘制标签和置信度
-            label_text = f"{cls_name}: {conf:.2f}"
+            label_text = ""
+            if True:  # SHOW_LABEL
+                label_text += cls_name
+            if True:  # SHOW_CONF
+                label_text += f" ({conf:.2f})" if label_text else f"{conf:.2f}"
+
             # 绘制文本背景（提高可读性）
             text_size = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)[0]
             text_bg_x2 = x1 + text_size[0] + 6

@@ -276,3 +276,4 @@ async def process_banner_detection_task(
     except Exception as e:
         processing_tasks[task_id]["status"] = "failed"
         processing_tasks[task_id]["error"] = str(e)
+        print(f"横幅检测处理失败: {e}")

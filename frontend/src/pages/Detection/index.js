@@ -20,7 +20,7 @@ const DetectionPage = () => {
     }
 
     try {
-      // 构建查询参数
+      // 根据检测类型添加相应的参数
       let url = `http://localhost:8000/process_video/?file_id=${fileId}`;
 
       // 添加检测类型参数
@@ -43,6 +43,14 @@ const DetectionPage = () => {
         url += `&detect_loitering=false`;
         if (params.leave_threshold) {
           url += `&leave_threshold=${params.leave_threshold}`;
+        }
+      } else if (params.detection_type === 'banner') {
+        url += `&detect_loitering=false`;
+        if (params.banner_conf_threshold) {
+          url += `&banner_conf_threshold=${params.banner_conf_threshold}`;
+        }
+        if (params.banner_iou_threshold) {
+          url += `&banner_iou_threshold=${params.banner_iou_threshold}`;
         }
       }
 
@@ -102,6 +110,32 @@ const DetectionPage = () => {
           default: 5,
           min: 1,
           unit: '秒'
+        }
+      ]
+    },
+    {
+      value: 'banner',
+      label: '横幅检测',
+      parameters: [
+        {
+          name: 'banner_conf_threshold',
+          label: '置信度阈值',
+          type: 'number',
+          default: 0.5,
+          min: 0.1,
+          max: 1.0,
+          step: 0.1,
+          unit: ''
+        },
+        {
+          name: 'banner_iou_threshold',
+          label: 'IoU阈值',
+          type: 'number',
+          default: 0.45,
+          min: 0.1,
+          max: 1.0,
+          step: 0.1,
+          unit: ''
         }
       ]
     }

@@ -387,9 +387,9 @@ def process_camera_leave_stream(camera_id: str, roi: Optional[list] = None, thre
             )
 
             # 绘制检测到的人员框
-            for box in result['person_boxes']:
+            for box in result['roi_person_boxes']:  # 只绘制ROI区域内的人员框
                 x1, y1, x2, y2 = box.astype(int)
-                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
             # 编码帧
             _, buffer = cv2.imencode('.jpg', annotated_frame)

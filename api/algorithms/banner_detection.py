@@ -17,17 +17,18 @@ class BannerDetector:
         初始化横幅检测器
 
         Args:
-            model_path (str): YOLOv12模型路径，如果为None则使用专用的横幅检测模型
+            model_path (str): YOLOv12模型路径，如果为None则使用yolov12文件夹中的banner_weight.pt
             conf_threshold (float): 置信度阈值
             iou_threshold (float): NMS IoU阈值
             img_size (int): 图像处理尺寸
             device (str): 运行设备 ('cuda' 或 'cpu')
         """
-        # 如果没有提供模型路径，使用横幅检测专用模型
+        # 获取项目根目录
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+        # 如果没有提供模型路径，使用yolov12文件夹中的banner_weight.pt
         if model_path is None:
-            # 获取项目根目录
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            model_path = os.path.join(project_root, "yolov12", "banner_model.pt")
+            model_path = os.path.join(project_root, "yolov12", "banner_weight.pt")
 
         print(f"[BannerDetector] 开始初始化，模型路径: {model_path}")
         try:
@@ -38,10 +39,9 @@ class BannerDetector:
 
             print(f"[BannerDetector] 使用设备: {device}")
 
-            # 使用 YOLOModelManager 加载模型
-            from api.models.yolo_models import YOLOModelManager
-            model_manager = YOLOModelManager(model_dir=os.path.join(project_root, "yolov12"))
-            self.model = model_manager.load_model(os.path.basename(model_path), device)
+            # 尝试直接使用 ultralytics YOLO 加载模型
+            self.model = YOLO(model_path)
+            self.model.to(device)
             self.device = device
 
             # 打印模型信息
@@ -51,8 +51,19 @@ class BannerDetector:
 
         except Exception as e:
             print(f"[BannerDetector] 模型加载错误: {e}")
-            print("[BannerDetector] 请确保已下载YOLOv12模型文件")
-            sys.exit(1)
+            # 尝试使用默认的 yolov12n.pt 模型
+            try:
+                default_model_path = os.path.join(project_root, "yolov12", "yolov12n.pt")
+                print(f"[BannerDetector] 尝试加载默认模型: {default_model_path}")
+                self.model = YOLO(default_model_path)
+                self.model.to(device)
+                self.device = device
+                print(f"[BannerDetector] 默认模型加载成功!")
+                print(f"[BannerDetector] 可用类别总数: {len(self.model.names)}")
+            except Exception as fallback_error:
+                print(f"[BannerDetector] 默认模型加载也失败了: {fallback_error}")
+                print("[BannerDetector] 请确保已下载YOLOv12模型文件")
+                raise
 
         # 配置参数（与bannerdetect.py保持一致）
         self.conf_threshold = conf_threshold
@@ -73,7 +84,7 @@ class BannerDetector:
 
     def detect_banner(self, frame):
         """
-        检测视频帧中的横幅（完全按照bannerdetect.py的实现）
+        检测视频帧中的横幅
 
         Args:
             frame: 视频帧
