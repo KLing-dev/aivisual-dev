@@ -39,6 +39,10 @@ const DetectionPage = () => {
         if (params.gather_threshold) {
           url += `&gather_threshold=${params.gather_threshold}`;
         }
+        if (params.gather_roi) {
+          // URL编码ROI参数
+          url += `&gather_roi=${encodeURIComponent(params.gather_roi)}`;
+        }
       } else if (params.detection_type === 'leave') {
         url += `&detect_loitering=false`;
         if (params.leave_threshold) {
@@ -96,6 +100,13 @@ const DetectionPage = () => {
           default: 5,
           min: 1,
           unit: '人'
+        },
+        {
+          name: 'gather_roi',
+          label: '聚集检测区域',
+          type: 'text',
+          default: '[(220,300),(700,300),(700,700),(200,700)]',
+          placeholder: '格式: [(x1,y1),(x2,y2),(x3,y3),(x4,y4)]'
         }
       ]
     },

@@ -7,24 +7,23 @@ from typing import Optional
 import os
 import uuid
 from api.config.settings import UPLOAD_DIR, PROCESSED_DIR
-from api.algorithms.video_processor import VideoProcessor
+from api.services.video_service import VideoService
 
 router = APIRouter()
 
-processing_tasks = {}
+# 初始化视频服务
+video_service = VideoService()
+
 
 @router.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     """上传文件（图像或视频）"""
-    file_id = str(uuid.uuid4())
-    file_path = os.path.join(UPLOAD_DIR, f"{file_id}_{file.filename}")
-
-    # 保存文件
-    with open(file_path, "wb") as buffer:
+    try:
         content = await file.read()
-        buffer.write(content)
-
-    return {"file_id": file_id, "filename": file.filename, "saved_path": file_path}
+        result = video_service.upload_file(content, file.filename)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/process_video/")
@@ -46,100 +45,86 @@ async def process_video(
         banner_iou_threshold: Optional[float] = None
 ):
     """处理视频文件"""
-    # 查找文件
-    file_path = None
-    for filename in os.listdir(UPLOAD_DIR):
-        if filename.startswith(file_id):
-            file_path = os.path.join(UPLOAD_DIR, filename)
-            break
+    try:
+        # 解析ROI参数
+        parsed_leave_roi = None
+        parsed_gather_roi = None
+        parsed_banner_roi = None
 
-    if not file_path or not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="文件未找到")
+        if leave_roi:
+            try:
+                # 解析格式如: "[(600,100),(1000,100),(1000,700),(600,700)]"
+                parsed_leave_roi = eval(leave_roi)
+            except:
+                pass
 
-    # 添加后台任务处理视频
-    task_id = str(uuid.uuid4())
-    processing_tasks[task_id] = {
-        "status": "processing",
-        "progress": 0,
-        "result_path": None,
-        "camera_id": camera_id,
-        "detection_type": detection_type
-    }
+        if gather_roi:
+            try:
+                # 解析格式如: "[(220,300),(700,300),(700,700),(200,700)]"
+                parsed_gather_roi = eval(gather_roi)
+            except:
+                pass
 
-    # 解析ROI参数
-    parsed_leave_roi = None
-    parsed_gather_roi = None
-    parsed_banner_roi = None
+        if banner_roi:
+            try:
+                # 解析格式如: "[(0,0),(1280,0),(1280,720),(0,720)]"
+                parsed_banner_roi = eval(banner_roi)
+            except:
+                pass
 
-    if leave_roi:
-        try:
-            # 解析格式如: "[(600,100),(1000,100),(1000,700),(600,700)]"
-            parsed_leave_roi = eval(leave_roi)
-        except:
-            pass
+        # 添加后台任务处理视频
+        task_id = str(uuid.uuid4())
 
-    if gather_roi:
-        try:
-            # 解析格式如: "[(220,300),(700,300),(700,700),(200,700)]"
-            parsed_gather_roi = eval(gather_roi)
-        except:
-            pass
+        # 根据检测类型选择不同的处理函数
+        if detection_type == "leave":
+            # 离岗检测
+            background_tasks.add_task(
+                process_leave_detection_task,
+                file_id,
+                task_id,
+                parsed_leave_roi,
+                leave_threshold,
+                camera_id
+            )
+        elif detection_type == "gather":
+            # 聚集检测
+            background_tasks.add_task(
+                process_gather_detection_task,
+                file_id,
+                task_id,
+                parsed_gather_roi,
+                gather_threshold,
+                camera_id
+            )
+        elif detection_type == "banner":
+            # 横幅检测
+            background_tasks.add_task(
+                process_banner_detection_task,
+                file_id,
+                task_id,
+                parsed_banner_roi,
+                banner_conf_threshold,
+                banner_iou_threshold,
+                camera_id
+            )
+        else:
+            # 默认为徘徊检测
+            background_tasks.add_task(
+                process_video_task,
+                file_id,
+                task_id,
+                detect_loitering,
+                loitering_time_threshold,
+                camera_id
+            )
 
-    if banner_roi:
-        try:
-            # 解析格式如: "[(0,0),(1280,0),(1280,720),(0,720)]"
-            parsed_banner_roi = eval(banner_roi)
-        except:
-            pass
-
-    # 根据检测类型选择不同的处理函数
-    if detection_type == "leave":
-        # 离岗检测
-        background_tasks.add_task(
-            process_leave_detection_task,
-            file_path,
-            task_id,
-            parsed_leave_roi,
-            leave_threshold,
-            camera_id
-        )
-    elif detection_type == "gather":
-        # 聚集检测
-        background_tasks.add_task(
-            process_gather_detection_task,
-            file_path,
-            task_id,
-            parsed_gather_roi,
-            gather_threshold,
-            camera_id
-        )
-    elif detection_type == "banner":
-        # 横幅检测
-        background_tasks.add_task(
-            process_banner_detection_task,
-            file_path,
-            task_id,
-            parsed_banner_roi,
-            banner_conf_threshold,
-            banner_iou_threshold,
-            camera_id
-        )
-    else:
-        # 默认为徘徊检测
-        background_tasks.add_task(
-            process_video_task,
-            file_path,
-            task_id,
-            detect_loitering,
-            loitering_time_threshold,
-            camera_id
-        )
-
-    return {"task_id": task_id, "message": f"{detection_type}视频处理已启动"}
+        return {"task_id": task_id, "message": f"{detection_type}视频处理已启动"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 async def process_video_task(
-        video_path: str,
+        file_id: str,
         task_id: str,
         detect_loitering: bool = True,
         loitering_time_threshold: int = 20,
@@ -147,8 +132,25 @@ async def process_video_task(
 ):
     """后台处理视频任务"""
     try:
+        # 查找文件
+        file_path = None
+        for filename in os.listdir(UPLOAD_DIR):
+            if filename.startswith(file_id):
+                file_path = os.path.join(UPLOAD_DIR, filename)
+                break
+
+        if not file_path or not os.path.exists(file_path):
+            # 更新任务状态为失败
+            if hasattr(video_service, 'processing_tasks'):
+                video_service.processing_tasks[task_id] = {
+                    "status": "failed",
+                    "error": "文件未找到"
+                }
+            return
+
         # 初始化视频处理器
-        processor = VideoProcessor()
+        from api.algorithms import VideoProcessingCoordinator
+        processor = VideoProcessingCoordinator()
 
         # 设置输出视频路径
         output_filename = f"processed_{uuid.uuid4()}.mp4"
@@ -156,26 +158,32 @@ async def process_video_task(
 
         # 处理视频
         result_path = processor.process_loitering_video(
-            video_path=video_path,
+            video_path=file_path,
             output_path=output_path,
             loitering_time_threshold=loitering_time_threshold
         )
 
         # 标记为完成
-        processing_tasks[task_id]["status"] = "completed"
-        processing_tasks[task_id]["result_path"] = result_path
-        processing_tasks[task_id]["camera_id"] = camera_id
+        if hasattr(video_service, 'processing_tasks'):
+            video_service.processing_tasks[task_id] = {
+                "status": "completed",
+                "result_path": result_path,
+                "camera_id": camera_id
+            }
 
         # 保存报警信息（示例）
         # 在实际应用中，这里会根据检测结果生成报警信息并保存到数据库
 
     except Exception as e:
-        processing_tasks[task_id]["status"] = "failed"
-        processing_tasks[task_id]["error"] = str(e)
+        if hasattr(video_service, 'processing_tasks'):
+            video_service.processing_tasks[task_id] = {
+                "status": "failed",
+                "error": str(e)
+            }
 
 
 async def process_leave_detection_task(
-        video_path: str,
+        file_id: str,
         task_id: str,
         roi: Optional[list] = None,
         threshold: Optional[int] = None,
@@ -183,8 +191,25 @@ async def process_leave_detection_task(
 ):
     """离岗检测处理任务"""
     try:
+        # 查找文件
+        file_path = None
+        for filename in os.listdir(UPLOAD_DIR):
+            if filename.startswith(file_id):
+                file_path = os.path.join(UPLOAD_DIR, filename)
+                break
+
+        if not file_path or not os.path.exists(file_path):
+            # 更新任务状态为失败
+            if hasattr(video_service, 'processing_tasks'):
+                video_service.processing_tasks[task_id] = {
+                    "status": "failed",
+                    "error": "文件未找到"
+                }
+            return
+
         # 初始化视频处理器
-        processor = VideoProcessor()
+        from api.algorithms import VideoProcessingCoordinator
+        processor = VideoProcessingCoordinator()
 
         # 设置输出视频路径
         output_filename = f"leave_processed_{uuid.uuid4()}.mp4"
@@ -192,24 +217,30 @@ async def process_leave_detection_task(
 
         # 处理视频
         result_path = processor.process_leave_video(
-            video_path=video_path,
+            video_path=file_path,
             output_path=output_path,
             roi=roi,
             absence_threshold=threshold if threshold is not None else 5
         )
 
         # 标记为完成
-        processing_tasks[task_id]["status"] = "completed"
-        processing_tasks[task_id]["result_path"] = result_path
-        processing_tasks[task_id]["camera_id"] = camera_id
+        if hasattr(video_service, 'processing_tasks'):
+            video_service.processing_tasks[task_id] = {
+                "status": "completed",
+                "result_path": result_path,
+                "camera_id": camera_id
+            }
 
     except Exception as e:
-        processing_tasks[task_id]["status"] = "failed"
-        processing_tasks[task_id]["error"] = str(e)
+        if hasattr(video_service, 'processing_tasks'):
+            video_service.processing_tasks[task_id] = {
+                "status": "failed",
+                "error": str(e)
+            }
 
 
 async def process_gather_detection_task(
-        video_path: str,
+        file_id: str,
         task_id: str,
         roi: Optional[list] = None,
         threshold: Optional[int] = None,
@@ -217,8 +248,25 @@ async def process_gather_detection_task(
 ):
     """聚集检测处理任务"""
     try:
+        # 查找文件
+        file_path = None
+        for filename in os.listdir(UPLOAD_DIR):
+            if filename.startswith(file_id):
+                file_path = os.path.join(UPLOAD_DIR, filename)
+                break
+
+        if not file_path or not os.path.exists(file_path):
+            # 更新任务状态为失败
+            if hasattr(video_service, 'processing_tasks'):
+                video_service.processing_tasks[task_id] = {
+                    "status": "failed",
+                    "error": "文件未找到"
+                }
+            return
+
         # 初始化视频处理器
-        processor = VideoProcessor()
+        from api.algorithms import VideoProcessingCoordinator
+        processor = VideoProcessingCoordinator()
 
         # 设置输出视频路径
         output_filename = f"gather_processed_{uuid.uuid4()}.mp4"
@@ -226,24 +274,30 @@ async def process_gather_detection_task(
 
         # 处理视频
         result_path = processor.process_gather_video(
-            video_path=video_path,
+            video_path=file_path,
             output_path=output_path,
             roi=roi,
             gather_threshold=threshold if threshold is not None else 5
         )
 
         # 标记为完成
-        processing_tasks[task_id]["status"] = "completed"
-        processing_tasks[task_id]["result_path"] = result_path
-        processing_tasks[task_id]["camera_id"] = camera_id
+        if hasattr(video_service, 'processing_tasks'):
+            video_service.processing_tasks[task_id] = {
+                "status": "completed",
+                "result_path": result_path,
+                "camera_id": camera_id
+            }
 
     except Exception as e:
-        processing_tasks[task_id]["status"] = "failed"
-        processing_tasks[task_id]["error"] = str(e)
+        if hasattr(video_service, 'processing_tasks'):
+            video_service.processing_tasks[task_id] = {
+                "status": "failed",
+                "error": str(e)
+            }
 
 
 async def process_banner_detection_task(
-        video_path: str,
+        file_id: str,
         task_id: str,
         roi: Optional[list] = None,
         conf_threshold: Optional[float] = None,
@@ -252,8 +306,25 @@ async def process_banner_detection_task(
 ):
     """横幅检测处理任务"""
     try:
+        # 查找文件
+        file_path = None
+        for filename in os.listdir(UPLOAD_DIR):
+            if filename.startswith(file_id):
+                file_path = os.path.join(UPLOAD_DIR, filename)
+                break
+
+        if not file_path or not os.path.exists(file_path):
+            # 更新任务状态为失败
+            if hasattr(video_service, 'processing_tasks'):
+                video_service.processing_tasks[task_id] = {
+                    "status": "failed",
+                    "error": "文件未找到"
+                }
+            return
+
         # 初始化视频处理器
-        processor = VideoProcessor()
+        from api.algorithms import VideoProcessingCoordinator
+        processor = VideoProcessingCoordinator()
 
         # 设置输出视频路径
         output_filename = f"banner_processed_{uuid.uuid4()}.mp4"
@@ -261,7 +332,7 @@ async def process_banner_detection_task(
 
         # 处理视频
         result_path = processor.process_banner_video(
-            video_path=video_path,
+            video_path=file_path,
             output_path=output_path,
             roi=roi,
             conf_threshold=conf_threshold if conf_threshold is not None else 0.5,
@@ -269,11 +340,17 @@ async def process_banner_detection_task(
         )
 
         # 标记为完成
-        processing_tasks[task_id]["status"] = "completed"
-        processing_tasks[task_id]["result_path"] = result_path
-        processing_tasks[task_id]["camera_id"] = camera_id
+        if hasattr(video_service, 'processing_tasks'):
+            video_service.processing_tasks[task_id] = {
+                "status": "completed",
+                "result_path": result_path,
+                "camera_id": camera_id
+            }
 
     except Exception as e:
-        processing_tasks[task_id]["status"] = "failed"
-        processing_tasks[task_id]["error"] = str(e)
+        if hasattr(video_service, 'processing_tasks'):
+            video_service.processing_tasks[task_id] = {
+                "status": "failed",
+                "error": str(e)
+            }
         print(f"横幅检测处理失败: {e}")

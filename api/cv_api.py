@@ -13,6 +13,7 @@ sys.path.insert(0, project_path)
 from api.routes.file_routes import router as file_router
 from api.routes.task_routes import router as task_router
 from api.routes.camera_routes import router as camera_router
+from api.routes.ga1400_routes import router as ga1400_router
 
 # 初始化 FastAPI 应用
 app = FastAPI(title="计算机视觉API",
@@ -31,10 +32,13 @@ app.add_middleware(
 app.include_router(file_router)
 app.include_router(task_router)
 app.include_router(camera_router)
+app.include_router(ga1400_router)
+
 
 @app.get("/")
 async def root():
     return {"message": "欢迎使用计算机视觉API", "version": "1.0.0"}
+
 
 if __name__ == "__main__":
     import uvicorn

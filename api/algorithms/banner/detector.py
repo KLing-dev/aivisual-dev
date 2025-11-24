@@ -1,7 +1,6 @@
 """
 横幅检测算法实现
 基于YOLOv12的目标检测算法
-完全按照bannerdetect.py的实现方式
 """
 
 import cv2
@@ -10,6 +9,7 @@ import sys
 import torch
 import os
 from ultralytics import YOLO
+
 
 class BannerDetector:
     def __init__(self, model_path=None, conf_threshold=0.3, iou_threshold=0.45, img_size=640, device='cuda'):
@@ -65,12 +65,12 @@ class BannerDetector:
                 print("[BannerDetector] 请确保已下载YOLOv12模型文件")
                 raise
 
-        # 配置参数（与bannerdetect.py保持一致）
+        # 配置参数
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         self.img_size = img_size
 
-        # 绘制参数（与bannerdetect.py保持一致）
+        # 绘制参数
         self.SHOW_LABEL = True  # 是否显示检测标签
         self.SHOW_CONF = True  # 是否显示置信度
         self.BOX_COLOR = (0, 255, 0)  # 检测框颜色（BGR：绿色）
@@ -93,7 +93,7 @@ class BannerDetector:
             results: 检测结果
             banners: 横幅信息
         """
-        # 使用YOLOv12检测目标（完全按照bannerdetect.py的方式）
+        # 使用YOLOv12检测目标
         results = self.model(
             frame,
             imgsz=self.img_size,
@@ -102,7 +102,7 @@ class BannerDetector:
             verbose=False  # 关闭推理日志输出
         )
 
-        # 解析检测结果（完全按照bannerdetect.py的方式）
+        # 解析检测结果
         banners = []
         for r in results:
             boxes = r.boxes  # 检测框信息
@@ -115,7 +115,7 @@ class BannerDetector:
                     cls = int(box.cls[0].item())
                     cls_name = self.model.names[cls]  # 类别名称
 
-                    # 存储检测信息（与bannerdetect.py完全一致）
+                    # 存储检测信息
                     banners.append({
                         'box': (x1, y1, x2, y2),
                         'confidence': conf,
@@ -129,7 +129,7 @@ class BannerDetector:
 
     def draw_detections(self, frame, banners):
         """
-        在帧上绘制检测结果（完全按照bannerdetect.py的方式）
+        在帧上绘制检测结果
 
         Args:
             frame: 视频帧
@@ -138,7 +138,7 @@ class BannerDetector:
         Returns:
             frame_with_detections: 绘制了检测结果的视频帧
         """
-        # 解析检测结果并绘制（完全按照bannerdetect.py的方式）
+        # 解析检测结果并绘制
         for banner in banners:
             x1, y1, x2, y2 = banner['box']
             conf = banner['confidence']
@@ -147,7 +147,7 @@ class BannerDetector:
             # 绘制检测框
             cv2.rectangle(frame, (x1, y1), (x2, y2), self.BOX_COLOR, self.LINE_WIDTH)
 
-            # 绘制标签和置信度（完全按照bannerdetect.py的方式）
+            # 绘制标签和置信度
             if self.SHOW_LABEL or self.SHOW_CONF:
                 label_text = ""
                 if self.SHOW_LABEL:
@@ -167,7 +167,7 @@ class BannerDetector:
                     cv2.FONT_HERSHEY_SIMPLEX, self.FONT_SCALE, self.TEXT_COLOR, 1
                 )
 
-        # 添加帧信息（左上角，完全按照bannerdetect.py的方式）
+        # 添加帧信息
         frame_info = f"YOLOv12 Banner Detection | Conf: {self.conf_threshold}"
         cv2.putText(frame, frame_info, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 

@@ -59,7 +59,7 @@ class Args:
 
 class LoiteringDetector:
     def __init__(self, model_path="yolov12/yolov12n.pt", loitering_time_threshold=20, target_classes=["person"],
-                 conf_threshold=0.5, img_size=640, device='cuda', detection_region=None, use_bytetrack=True):
+                 conf_threshold=0.3, img_size=640, device='cuda', detection_region=None, use_bytetrack=True):
         """
         初始化徘徊检测器
 
@@ -297,7 +297,8 @@ class LoiteringDetector:
                                         'current_time': frame_time,
                                         'duration': total_time,
                                         'position': box,
-                                        'class': class_name
+                                        'class': class_name,
+                                        'object_id': object_id  # 添加对象ID到警报信息中
                                     }
                                 # 如果移动距离较大，且之前有警报，则移除警报
                                 elif total_distance >= 50 and object_id in self.loitering_alarms:
@@ -407,22 +408,40 @@ class LoiteringDetector:
             if dets:
                 # 使用ByteTrack跟踪
                 try:
-                    online_targets = self.tracker.update(np.array(dets), [h, w], [h, w])
+                    # 创建一个模拟的结果对象，使其与ultralytics的BYTETracker兼容
+                    class DetectionResults:
+                        def __init__(self, dets):
+                            # xyxy坐标 (x1, y1, x2, y2)
+                            self.xyxy = torch.tensor(np.array([det[:4] for det in dets]))
+                            # 置信度
+                            self.conf = torch.tensor(np.array([det[4] for det in dets]))
+                            # 类别
+                            self.cls = torch.zeros(len(dets))  # 假设所有都是同一类（如person）
+                            # xywh坐标 (中心点x, 中心点y, 宽度, 高度)
+                            boxes = self.xyxy
+                            self.xywh = torch.stack([
+                                (boxes[:, 0] + boxes[:, 2]) / 2,  # x center
+                                (boxes[:, 1] + boxes[:, 3]) / 2,  # y center
+                                boxes[:, 2] - boxes[:, 0],        # width
+                                boxes[:, 3] - boxes[:, 1]         # height
+                            ], dim=1)
+
+                    detection_results = DetectionResults(dets)
+                    online_targets = self.tracker.update(detection_results)
 
                     # 结合跟踪ID更新检测结果
-                    for t in online_targets:
-                        tlwh = t.tlwh
-                        tid = t.track_id
-                        vertical = tlwh[2] / tlwh[3] > 1.6
-                        if tlwh[2] * tlwh[3] > 10 and not vertical:
-                            x1, y1 = int(tlwh[0]), int(tlwh[1])
-                            x2, y2 = int(tlwh[0] + tlwh[2]), int(tlwh[1] + tlwh[3])
-                            # 添加跟踪ID到检测结果
-                            for i, det in enumerate(detections):
-                                det_coords = det[:4]
-                                if (abs(det_coords[0] - x1) < 5 and abs(det_coords[1] - y1) < 5 and
-                                    abs(det_coords[2] - x2) < 5 and abs(det_coords[3] - y2) < 5):
-                                    detections[i].append(tid)
+                    # 注意: online_targets 是一个numpy数组，不是STrack对象列表
+                    for target in online_targets:
+                        # target格式: [x1, y1, x2, y2, track_id, confidence, class, index]
+                        x1, y1, x2, y2 = map(int, target[:4])
+                        tid = int(target[4])
+
+                        # 添加跟踪ID到检测结果
+                        for i, det in enumerate(detections):
+                            det_coords = det[:4]
+                            if (abs(det_coords[0] - x1) < 5 and abs(det_coords[1] - y1) < 5 and
+                                abs(det_coords[2] - x2) < 5 and abs(det_coords[3] - y2) < 5):
+                                detections[i].append(tid)
                 except Exception as e:
                     print(f"Error in ByteTrack update: {e}")
 

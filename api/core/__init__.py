@@ -3,10 +3,10 @@
 包含所有计算机视觉检测算法的统一接口
 """
 
-from ..algorithms.loitering_detection import LoiteringDetector
-from ..algorithms.leave_detection import LeaveDetector
-from ..algorithms.gather_detection import GatherDetector
-from ..algorithms.banner_detection import BannerDetector
+from ..algorithms.loitering import LoiteringDetector
+from ..algorithms.leave import LeaveDetector
+from ..algorithms.gather import GatherDetector
+from ..algorithms.banner import BannerDetector
 
 __all__ = [
     "LoiteringDetector",
