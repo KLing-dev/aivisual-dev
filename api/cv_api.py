@@ -14,6 +14,7 @@ from api.routes.file_routes import router as file_router
 from api.routes.task_routes import router as task_router
 from api.routes.camera_routes import router as camera_router
 from api.routes.ga1400_routes import router as ga1400_router
+from api.routes.alarm_routes import router as alarm_router
 
 # 初始化 FastAPI 应用
 app = FastAPI(title="计算机视觉API",
@@ -33,6 +34,7 @@ app.include_router(file_router)
 app.include_router(task_router)
 app.include_router(camera_router)
 app.include_router(ga1400_router)
+app.include_router(alarm_router)
 
 
 @app.get("/")
