@@ -6,7 +6,7 @@ GA/T 1400 公安视频图像信息应用系统标准接口路由
 from fastapi import APIRouter, HTTPException, Body
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
-from api.services.ga1400_service import GA1400Service
+from ..services.ga1400_service import GA1400Service
 
 router = APIRouter(prefix="/api/1400")
 

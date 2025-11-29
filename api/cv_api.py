@@ -1,23 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import sys
 
-# 添加项目路径
-project_path = os.path.dirname(os.path.abspath(__file__))
-parent_path = os.path.dirname(project_path)
-sys.path.insert(0, parent_path)
-sys.path.insert(0, project_path)
-
-# 导入路由
-from api.routes.file_routes import router as file_router
-from api.routes.task_routes import router as task_router
-from api.routes.camera_routes import router as camera_router
-from api.routes.ga1400_routes import router as ga1400_router
+# 使用相对导入
+from .routes.file_routes import router as file_router
+from .routes.task_routes import router as task_router
+from .routes.camera_routes import router as camera_router
+from .routes.ga1400_routes import router as ga1400_router
+from .routes.alarm_routes import router as alarm_router
 
 # 初始化 FastAPI 应用
-app = FastAPI(title="计算机视觉API",
-              description="基于YOLOv12和ByteTrack的计算机视觉服务，提供人员检测、跟踪和异常行为检测功能")
+app = FastAPI(title="检测引擎API")
 
 # 配置CORS
 app.add_middleware(
@@ -33,6 +25,7 @@ app.include_router(file_router)
 app.include_router(task_router)
 app.include_router(camera_router)
 app.include_router(ga1400_router)
+app.include_router(alarm_router)
 
 
 @app.get("/")

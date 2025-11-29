@@ -7,11 +7,8 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse, JSONResponse
 from typing import List, Optional
 import cv2
-import json
-from datetime import datetime
-import os
-from api.services.camera_service import CameraService
-from api.algorithms import VideoProcessingCoordinator
+from ..services.camera_service import CameraService
+from ..algorithms import VideoProcessingCoordinator
 
 router = APIRouter()
 
