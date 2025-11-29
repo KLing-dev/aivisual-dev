@@ -49,6 +49,10 @@ class LeaveDetector:
         Returns:
             bool: 点是否在ROI内
         """
+        # 如果ROI为None，认为所有点都在ROI内（兼容处理）
+        if roi is None:
+            return True
+            
         x, y = point
         n = len(roi)
         inside = False

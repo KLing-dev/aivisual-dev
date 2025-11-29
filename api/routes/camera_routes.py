@@ -287,6 +287,11 @@ def process_camera_leave_stream(camera_id: str, roi: Optional[list] = None, thre
         # 初始化检测器
         detector = processor._get_leave_detector()
 
+        # 设置默认ROI区域（如果没有通过参数传递）
+        if roi is None:
+            # 默认ROI区域可以根据您的需要修改
+            roi = [(220, 300), (700, 300), (700, 700), (200, 700)]
+
         # 状态变量
         absence_start_time = None
         alert_triggered = False
@@ -307,7 +312,7 @@ def process_camera_leave_stream(camera_id: str, roi: Optional[list] = None, thre
             )
 
             # 绘制检测到的人员框
-            for box in result['roi_person_boxes']:  # 只绘制ROI区域内的人员框
+            for box in result['person_boxes']:  # 绘制所有检测到的人员框
                 x1, y1, x2, y2 = box.astype(int)
                 cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
