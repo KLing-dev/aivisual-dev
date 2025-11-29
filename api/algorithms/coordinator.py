@@ -6,9 +6,12 @@
 from typing import Optional, List, Tuple
 from .loitering.processor import process_loitering_video
 from .loitering.detector import LoiteringDetector
-from .leave.processor import process_leave_video
-from .gather.processor import process_gather_video
-from .banner.processor import process_banner_video
+from .leave.processor import process_leave_video, draw_leave_detections
+from .leave.detector import LeaveDetector
+from .gather.processor import process_gather_video, draw_gather_detections
+from .gather.detector import GatherDetector
+from .banner.processor import process_banner_video, draw_banner_detections
+from .banner.detector import BannerDetector
 
 
 class VideoProcessingCoordinator:
@@ -43,6 +46,104 @@ class VideoProcessingCoordinator:
             model_name=self.model_name,
             loitering_time_threshold=loitering_time_threshold
         )
+
+    def _get_leave_detector(self):
+        """
+        获取离岗检测器实例
+
+        Returns:
+            LeaveDetector: 离岗检测器实例
+        """
+        return LeaveDetector(
+            model_path=self.model_name
+        )
+
+    def _get_gather_detector(self):
+        """
+        获取聚集检测器实例
+
+        Returns:
+            GatherDetector: 聚集检测器实例
+        """
+        return GatherDetector(
+            model_path=self.model_name
+        )
+
+    def _get_banner_detector(self, conf_threshold: float = 0.3, iou_threshold: float = 0.45):
+        """
+        获取横幅检测器实例
+
+        Args:
+            conf_threshold: 置信度阈值
+            iou_threshold: NMS IoU阈值
+
+        Returns:
+            BannerDetector: 横幅检测器实例
+        """
+        # 横幅检测使用专门的banner_weight.pt权重文件
+        import os
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        banner_model_path = os.path.join(project_root, "yolov12", "banner_weight.pt")
+        
+        # 如果banner专用权重文件存在，则使用它；否则使用默认模型
+        if os.path.exists(banner_model_path):
+            model_path = banner_model_path
+        else:
+            print(f"[Coordinator] 未找到横幅专用权重文件 {banner_model_path}，使用默认模型 {self.model_name}")
+            model_path = self.model_name
+        
+        return BannerDetector(
+            model_path=model_path,
+            conf_threshold=conf_threshold,
+            iou_threshold=iou_threshold
+        )
+
+    def _draw_leave_detections(self, frame, roi, status, roi_person_count, absence_start_time, threshold, alert_triggered):
+        """
+        绘制离岗检测结果
+
+        Args:
+            frame: 视频帧
+            roi: ROI区域
+            status: 状态（在岗/脱岗）
+            roi_person_count: ROI内人数
+            absence_start_time: 脱岗开始时间
+            threshold: 脱岗阈值
+            alert_triggered: 是否触发警报
+
+        Returns:
+            frame: 绘制了检测结果的帧
+        """
+        return draw_leave_detections(frame, roi, status, roi_person_count, absence_start_time, threshold, alert_triggered)
+
+    def _draw_gather_detections(self, frame, roi, roi_person_count, gather_threshold, alert_triggered):
+        """
+        绘制聚集检测结果
+
+        Args:
+            frame: 视频帧
+            roi: ROI区域
+            roi_person_count: ROI内人数
+            gather_threshold: 聚集人数阈值
+            alert_triggered: 是否触发警报
+
+        Returns:
+            frame: 绘制了检测结果的帧
+        """
+        return draw_gather_detections(frame, roi, roi_person_count, gather_threshold, alert_triggered)
+
+    def _draw_banner_detections(self, frame, banners):
+        """
+        绘制横幅检测结果
+
+        Args:
+            frame: 视频帧
+            banners: 检测到的横幅信息
+
+        Returns:
+            frame: 绘制了检测结果的帧
+        """
+        return draw_banner_detections(frame, banners)
 
     def process_loitering_video(self,
                                 video_path: str,
