@@ -9,40 +9,46 @@ import sys
 import torch
 import os
 
-# 确保优先使用项目中的yolov12模块而不是site-packages中的
-project_yolov12_path = os.path.join(os.path.dirname(__file__), '..', '..', 'yolov12')
+# 确保使用项目中的yolov12模块
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+project_yolov12_path = os.path.join(project_root, 'yolov12')
+
+# 移除可能存在的其他ultralytics模块路径
+paths_to_remove = []
+for path in sys.path:
+    if 'ultralytics' in path and 'site-packages' in path:
+        paths_to_remove.append(path)
+
+for path in paths_to_remove:
+    sys.path.remove(path)
+    print(f"Removed path: {path}")
+
 if project_yolov12_path not in sys.path:
     sys.path.insert(0, project_yolov12_path)
+    print(f"Inserted project yolov12 path: {project_yolov12_path}")
 
+print("Current sys.path:")
+for p in sys.path:
+    print(f"  {p}")
+
+# 直接从项目本地的yolov12导入ultralytics
 try:
-    # 优先使用YOLOv12的ultralytics
     from ultralytics import YOLO
-    print("Successfully imported Ultralytics library from YOLOv12")
+    print("Successfully imported Ultralytics library from local YOLOv12")
+    import ultralytics
+    print(f"Ultralytics module path: {ultralytics.__file__}")
 except ImportError as e:
-    try:
-        # 如果失败，尝试使用系统安装的ultralytics
-        import sys
-        # 移除yolov12路径以避免冲突
-        yolov12_path = os.path.join(os.path.dirname(__file__), '..', '..', 'yolov12')
-        if yolov12_path in sys.path:
-            sys.path.remove(yolov12_path)
-        from ultralytics import YOLO
-        print("Successfully imported Ultralytics library from system")
-    except ImportError as e:
-        print("Error importing Ultralytics library:", e)
-        print("Please install required dependencies with: pip install ultralytics")
-        sys.exit(1)
+    print("Error importing Ultralytics library:", e)
+    sys.exit(1)
 
-# 尝试导入ByteTrack
-BYTETRACK_AVAILABLE = False
+# 从yolov12的ultralytics导入ByteTrack
 try:
-    # 从yolov12的ultralytics导入
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'yolov12'))
     from ultralytics.trackers.byte_tracker import BYTETracker
     BYTETRACK_AVAILABLE = True
-    print("Successfully imported ByteTrack tracker from ultralytics.trackers")
+    print("Successfully imported ByteTrack tracker from local ultralytics.trackers")
 except ImportError as e:
     print("ByteTrack not available:", str(e))
+    BYTETRACK_AVAILABLE = False
     print("Using basic tracking")
 
 # 定义Args类用于ByteTrack参数配置
@@ -58,13 +64,13 @@ class Args:
 
 
 class LoiteringDetector:
-    def __init__(self, model_path="yolov12/yolov12n.pt", loitering_time_threshold=20, target_classes=["person"],
+    def __init__(self, model_name="yolov12n.pt", loitering_time_threshold=20, target_classes=["person"],
                  conf_threshold=0.3, img_size=640, device='cuda', detection_region=None, use_bytetrack=True):
         """
         初始化徘徊检测器
 
         Args:
-            model_path (str): YOLOv12模型路径
+            model_name (str): YOLOv12模型文件名
             loitering_time_threshold (int): 徘徊时间阈值（秒）
             target_classes (list): 要检测的目标类别列表
             conf_threshold (float): 置信度阈值
@@ -73,7 +79,7 @@ class LoiteringDetector:
             detection_region (tuple): 检测区域 (x, y, width, height) 或 None 表示全图检测
             use_bytetrack (bool): 是否使用ByteTrack跟踪器
         """
-        print(f"Loading YOLOv12 model from {model_path}...")
+        print(f"Loading YOLOv12 model: {model_name}...")
         try:
             # 检查设备可用性
             if device == 'cuda' and not torch.cuda.is_available():
@@ -83,9 +89,9 @@ class LoiteringDetector:
             print(f"Using device: {device}")
 
             # 使用 YOLOModelManager 加载模型
-            from api.models.yolo_models import YOLOModelManager
-            model_manager = YOLOModelManager(model_dir=os.path.dirname(model_path) or "yolov12")
-            self.model = model_manager.load_model(os.path.basename(model_path), device)
+            from ...models.yolo_models import YOLOModelManager
+            model_manager = YOLOModelManager()
+            self.model = model_manager.load_model(model_name, device)
             self.device = device
 
             # 设置检测类别

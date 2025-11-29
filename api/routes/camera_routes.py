@@ -3,12 +3,13 @@
 处理实时摄像头流和摄像头管理功能
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Form
 from fastapi.responses import StreamingResponse, JSONResponse
 from typing import List, Optional
 import cv2
 from ..services.camera_service import CameraService
 from ..algorithms import VideoProcessingCoordinator
+from ..algorithms.loitering.processor import draw_loitering_detections
 
 router = APIRouter()
 
@@ -59,7 +60,7 @@ async def assign_camera_to_scene(camera_id: str, scene_type: str):
 
 
 @router.post("/cameras/bind_device")
-async def bind_camera_to_device(camera_id: str, device_source: str):
+async def bind_camera_to_device(camera_id: str = Form(...), device_source: str = Form(...)):
     """
     将摄像头绑定到设备源
     - camera_id: 摄像头ID
@@ -105,7 +106,7 @@ async def get_camera_device(camera_id: str):
 
 
 @router.post("/cameras")
-async def add_camera(camera_id: str, name: str, location: str):
+async def add_camera(camera_id: str = Form(default=""), name: str = Form(default=""), location: str = Form(default="")):
     """
     添加新的摄像头
     - camera_id: 摄像头ID
@@ -136,7 +137,7 @@ async def remove_camera(camera_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/cameras/process_camera/")
+@router.get("/cameras/process_camera/")
 async def process_camera(
         camera_id: str = "default",
         detection_type: str = "loitering",
@@ -234,7 +235,7 @@ def get_camera_source(camera_id: str):
 def process_camera_loitering_stream(camera_id: str, loitering_time_threshold: int = 20):
     """处理摄像头徘徊检测视频流"""
     # 初始化视频处理器
-    processor = VideoProcessingCoordinator()
+    processor = VideoProcessingCoordinator(camera_id=camera_id)
 
     # 获取摄像头源
     camera_source = get_camera_source(camera_id)
@@ -257,7 +258,7 @@ def process_camera_loitering_stream(camera_id: str, loitering_time_threshold: in
             detections, alarms = detector.detect_loitering(frame, 0)  # 时间戳暂时设为0
 
             # 在帧上绘制检测结果
-            annotated_frame = processor._draw_loitering_detections(frame, detections, alarms)
+            annotated_frame = draw_loitering_detections(frame, detections, alarms)
 
             # 编码帧
             _, buffer = cv2.imencode('.jpg', annotated_frame)
@@ -272,7 +273,7 @@ def process_camera_loitering_stream(camera_id: str, loitering_time_threshold: in
 def process_camera_leave_stream(camera_id: str, roi: Optional[list] = None, threshold: Optional[int] = None):
     """处理摄像头离岗检测视频流"""
     # 初始化视频处理器
-    processor = VideoProcessingCoordinator()
+    processor = VideoProcessingCoordinator(camera_id=camera_id)
 
     # 获取摄像头源
     camera_source = get_camera_source(camera_id)
@@ -323,7 +324,7 @@ def process_camera_leave_stream(camera_id: str, roi: Optional[list] = None, thre
 def process_camera_gather_stream(camera_id: str, roi: Optional[list] = None, threshold: Optional[int] = None):
     """处理摄像头聚集检测视频流"""
     # 初始化视频处理器
-    processor = VideoProcessingCoordinator()
+    processor = VideoProcessingCoordinator(camera_id=camera_id)
 
     # 获取摄像头源
     camera_source = get_camera_source(camera_id)
@@ -375,7 +376,7 @@ def process_camera_banner_stream(camera_id: str, roi: Optional[list] = None,
                                 iou_threshold: Optional[float] = None):
     """处理摄像头横幅检测视频流"""
     # 初始化视频处理器
-    processor = VideoProcessingCoordinator()
+    processor = VideoProcessingCoordinator(camera_id=camera_id)
 
     # 获取摄像头源
     camera_source = get_camera_source(camera_id)

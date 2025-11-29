@@ -6,8 +6,8 @@
 import os
 import uuid
 from typing import List, Dict, Any, Optional
-from api.config.settings import UPLOAD_DIR, PROCESSED_DIR
-from api.algorithms import VideoProcessingCoordinator
+from ..config.settings import UPLOAD_DIR, PROCESSED_DIR
+from ..algorithms import VideoProcessingCoordinator
 
 
 class VideoService:
@@ -138,7 +138,7 @@ class VideoService:
         """后台处理视频任务"""
         try:
             # 初始化视频处理器
-            processor = VideoProcessingCoordinator()
+            processor = VideoProcessingCoordinator(camera_id=camera_id)
 
             # 设置输出视频路径
             output_filename = f"processed_{uuid.uuid4()}.mp4"
@@ -172,7 +172,7 @@ class VideoService:
         """离岗检测处理任务"""
         try:
             # 初始化视频处理器
-            processor = VideoProcessingCoordinator()
+            processor = VideoProcessingCoordinator(camera_id=camera_id)
 
             # 设置输出视频路径
             output_filename = f"leave_processed_{uuid.uuid4()}.mp4"
@@ -204,7 +204,7 @@ class VideoService:
         """聚集检测处理任务"""
         try:
             # 初始化视频处理器
-            processor = VideoProcessingCoordinator()
+            processor = VideoProcessingCoordinator(camera_id=camera_id)
 
             # 设置输出视频路径
             output_filename = f"gather_processed_{uuid.uuid4()}.mp4"

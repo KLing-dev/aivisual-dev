@@ -52,13 +52,3 @@ services:
     environment:
       - PYTHONPATH=/app
 
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    environment:
-      - REACT_APP_API_URL=http://localhost:8000

@@ -10,7 +10,7 @@ from .detector import LoiteringDetector
 
 
 def process_loitering_video(
-        model_path: str,
+        model_name: str,
         video_path: str,
         output_path: str,
         loitering_time_threshold: int = 20,
@@ -20,7 +20,7 @@ def process_loitering_video(
     处理徘徊检测视频
 
     Args:
-        model_path: 模型路径
+        model_name: 模型文件名
         video_path: 输入视频路径
         output_path: 输出视频路径
         loitering_time_threshold: 徘徊时间阈值（秒）
@@ -31,13 +31,13 @@ def process_loitering_video(
     """
     # 初始化检测器
     detector = LoiteringDetector(
-        model_path=model_path,
+        model_name=model_name,
         loitering_time_threshold=loitering_time_threshold,
         device=device
     )
 
     # 初始化核心处理器
-    core = VideoProcessorCore(model_path)
+    core = VideoProcessorCore(model_name)
 
     # 打开视频文件
     cap = core.open_video_capture(video_path)

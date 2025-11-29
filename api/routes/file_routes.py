@@ -149,8 +149,8 @@ async def process_video_task(
             return
 
         # 初始化视频处理器
-        from api.algorithms import VideoProcessingCoordinator
-        processor = VideoProcessingCoordinator()
+        from ..algorithms import VideoProcessingCoordinator
+        processor = VideoProcessingCoordinator(camera_id=camera_id)
 
         # 设置输出视频路径
         output_filename = f"processed_{uuid.uuid4()}.mp4"
@@ -208,8 +208,8 @@ async def process_leave_detection_task(
             return
 
         # 初始化视频处理器
-        from api.algorithms import VideoProcessingCoordinator
-        processor = VideoProcessingCoordinator()
+        from ..algorithms import VideoProcessingCoordinator
+        processor = VideoProcessingCoordinator(camera_id=camera_id)
 
         # 设置输出视频路径
         output_filename = f"leave_processed_{uuid.uuid4()}.mp4"
@@ -265,8 +265,8 @@ async def process_gather_detection_task(
             return
 
         # 初始化视频处理器
-        from api.algorithms import VideoProcessingCoordinator
-        processor = VideoProcessingCoordinator()
+        from ..algorithms import VideoProcessingCoordinator
+        processor = VideoProcessingCoordinator(camera_id=camera_id)
 
         # 设置输出视频路径
         output_filename = f"gather_processed_{uuid.uuid4()}.mp4"
@@ -323,8 +323,8 @@ async def process_banner_detection_task(
             return
 
         # 初始化视频处理器
-        from api.algorithms import VideoProcessingCoordinator
-        processor = VideoProcessingCoordinator()
+        from ..algorithms import VideoProcessingCoordinator
+        processor = VideoProcessingCoordinator(camera_id=camera_id)
 
         # 设置输出视频路径
         output_filename = f"banner_processed_{uuid.uuid4()}.mp4"

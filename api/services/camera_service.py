@@ -6,8 +6,8 @@
 import os
 import json
 from typing import List, Dict, Any, Optional
-from api.config.settings import UPLOAD_DIR, PROCESSED_DIR
-from api.algorithms import VideoProcessingCoordinator
+from ..config.settings import UPLOAD_DIR, PROCESSED_DIR
+from ..algorithms import VideoProcessingCoordinator
 
 
 class CameraService:

@@ -7,7 +7,7 @@ from .routes.task_routes import router as task_router
 from .routes.camera_routes import router as camera_router
 from .routes.ga1400_routes import router as ga1400_router
 from .routes.alarm_routes import router as alarm_router
-
+from .utils.ascii import ascii_art as draw
 # 初始化 FastAPI 应用
 app = FastAPI(title="检测引擎API")
 
@@ -35,5 +35,5 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-
+    print(draw)
     uvicorn.run(app, host="0.0.0.0", port=8000)

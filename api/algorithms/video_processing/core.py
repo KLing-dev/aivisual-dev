@@ -1,48 +1,40 @@
 """
 视频处理核心模块
-提供统一的视频处理接口和协调各类检测算法执行
+提供视频处理的基础功能
 """
 
 import cv2
-import numpy as np
-import os
-from typing import Optional, List, Tuple
-from datetime import datetime
+from typing import Tuple, Optional
+from ...models.yolo_models import YOLOModelManager
 
 
 class VideoProcessorCore:
-    """
-    视频处理核心类，负责协调各种检测任务的执行流程
-    """
+    """视频处理核心类"""
 
-    def __init__(self, model_path: str = "yolov12/yolov12n.pt"):
+    def __init__(self, model_name: str = "yolov12n.pt"):
         """
-        初始化视频处理器核心
+        初始化视频处理核心
 
         Args:
-            model_path: 模型路径
+            model_name: 模型文件名
         """
-        self.model_path = model_path
+        self.model_name = model_name
+        self.model_manager = YOLOModelManager()
 
-    def open_video_capture(self, video_path: str):
+    def open_video_capture(self, source):
         """
-        打开视频文件
+        打开视频捕获源
 
         Args:
-            video_path: 视频文件路径
+            source: 视频源（文件路径、摄像头索引或RTSP流地址）
 
         Returns:
             cv2.VideoCapture: 视频捕获对象
-
-        Raises:
-            Exception: 无法打开视频文件时抛出异常
         """
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            raise Exception(f"无法打开视频文件: {video_path}")
+        cap = cv2.VideoCapture(source)
         return cap
 
-    def get_video_properties(self, cap: cv2.VideoCapture) -> Tuple[int, int, int]:
+    def get_video_properties(self, cap) -> Tuple[float, int, int]:
         """
         获取视频属性
 
@@ -50,14 +42,14 @@ class VideoProcessorCore:
             cap: 视频捕获对象
 
         Returns:
-            Tuple[int, int, int]: (fps, width, height)
+            Tuple: (fps, width, height)
         """
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        fps = cap.get(cv2.CAP_PROP_FPS)
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         return fps, width, height
 
-    def create_video_writer(self, output_path: str, fps: int, width: int, height: int):
+    def create_video_writer(self, output_path: str, fps: float, width: int, height: int):
         """
         创建视频写入器
 
@@ -71,9 +63,10 @@ class VideoProcessorCore:
             cv2.VideoWriter: 视频写入器对象
         """
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        return cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        return out
 
-    def release_resources(self, cap: cv2.VideoCapture, out: Optional[cv2.VideoWriter] = None):
+    def release_resources(self, cap, out=None):
         """
         释放资源
 
@@ -81,7 +74,7 @@ class VideoProcessorCore:
             cap: 视频捕获对象
             out: 视频写入器对象（可选）
         """
-        if cap:
+        if cap and cap.isOpened():
             cap.release()
         if out:
             out.release()

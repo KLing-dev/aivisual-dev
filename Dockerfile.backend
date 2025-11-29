@@ -14,8 +14,7 @@ COPY requirements-cpu.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
     pip install -r requirements-cpu.txt && \
-    pip uninstall -y opencv-python opencv-contrib-python && \
-    pip install opencv-python-headless --force-reinstall --no-deps
+
 
 # 复制代码
 COPY api/ ./api/

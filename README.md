@@ -1,5 +1,4 @@
-# AI-Visual Detection System
-
+# Detect-Engine
 ## 简介
 
 这是一个基于YOLOv12的AI视频智能检测系统，具备目标检测、跟踪和多种行为分析功能，采用React + FastAPI的现代化前后端分离架构。
@@ -314,8 +313,7 @@ API路由已按功能模块分离到独立文件中：
 
 后端已在 FastAPI 中配置 CORS 支持，允许所有来源访问。在生产环境中，建议修改 `api/cv_api.py` 中的 CORS 配置，指定具体的域名：
 
-```python
-app.add_middleware(
+.api.app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://yourdomain.com"],  # 指定具体的域名
     allow_credentials=True,
