@@ -6,8 +6,8 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from typing import Optional
 import os
 import uuid
-from api.config.settings import UPLOAD_DIR, PROCESSED_DIR
-from api.services.video_service import VideoService
+from ..config.settings import UPLOAD_DIR, PROCESSED_DIR
+from ..services.video_service import VideoService
 
 router = APIRouter()
 

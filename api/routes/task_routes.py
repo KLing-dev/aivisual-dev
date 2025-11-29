@@ -7,9 +7,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from typing import List, Optional
 import os
 import json
-from datetime import datetime
-from api.config.settings import PROCESSED_DIR
-from api.services.video_service import VideoService
+from ..services.video_service import VideoService
 
 router = APIRouter()
 

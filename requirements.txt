@@ -25,3 +25,7 @@ lap>=0.5.12
 fastapi>=0.68.0
 uvicorn>=0.15.0
 python-multipart>=0.0.5
+
+# RabbitMQ dependencies
+pika>=1.3.2
+amqpstorm>=2.8.6
