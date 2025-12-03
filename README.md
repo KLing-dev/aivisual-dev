@@ -1,5 +1,4 @@
-# AI-Visual Detection System
-
+# Detect-Engine
 ## 简介
 
 这是一个基于YOLOv12的AI视频智能检测系统，具备目标检测、跟踪和多种行为分析功能，采用React + FastAPI的现代化前后端分离架构。
@@ -56,6 +55,14 @@ project/
 ├── docker-compose.yml       # Docker 容器编排配置
 └── requirements.txt         # Python 依赖
 ```
+## 快速开始
+```bash
+git clone https://github.com/yourusername/Detect-Engine.git
+# 在项目根目录下运行：
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
 
 ## 安装依赖
 
@@ -99,6 +106,11 @@ npm start
 ```bash
 # 使用docker-compose一键部署
 docker-compose up --build
+```
+
+```bash
+# RabbitMQ
+docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4-management
 ```
 
 访问地址：
@@ -183,20 +195,20 @@ docker-compose up --build
 
 ```bash
 # 构建后端镜像
-docker build -t cv-backend -f Dockerfile.backend .
-
-# 构建前端镜像
-docker build -t cv-frontend -f Dockerfile.frontend .
+docker build --platform linux/amd64 -f Dockerfile.backend -t cv-backend-x86 .
+docker save -o cv-backend-x86-amd64.tar cv-backend-x86:latest
 ```
 
 分别运行容器：
 
 ```bash
 # 运行后端服务
-docker run -d -p 8000:8000 --name backend cv-backend
+docker run -d \
+  --platform linux/amd64 \
+  --name cv-backend-container \
+  -p 8000:8000 \
+  cv-backend-x86
 
-# 运行前端应用
-docker run -d -p 3000:3000 --name frontend cv-frontend
 ```
 
 ## Git工作流规范
@@ -314,8 +326,7 @@ API路由已按功能模块分离到独立文件中：
 
 后端已在 FastAPI 中配置 CORS 支持，允许所有来源访问。在生产环境中，建议修改 `api/cv_api.py` 中的 CORS 配置，指定具体的域名：
 
-```python
-app.add_middleware(
+.api.app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://yourdomain.com"],  # 指定具体的域名
     allow_credentials=True,

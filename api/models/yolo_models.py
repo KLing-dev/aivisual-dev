@@ -18,7 +18,9 @@ class YOLOModelManager:
         Args:
             model_dir: 模型文件目录
         """
-        self.model_dir = model_dir
+        # 获取项目根目录的绝对路径
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        self.model_dir = os.path.join(project_root, model_dir) if model_dir == "yolov12" else model_dir
         self.models = {}
 
     def load_model(self, model_name="yolov12n.pt", device='cuda'):
@@ -38,10 +40,14 @@ class YOLOModelManager:
             device = 'cpu'
 
         model_path = os.path.join(self.model_dir, model_name)
+        print(f"Attempting to load model from: {model_path}")
 
         if model_name not in self.models:
             print(f"Loading YOLO model from {model_path}...")
             try:
+                if not os.path.exists(model_path):
+                    raise FileNotFoundError(f"Model file not found: {model_path}")
+                    
                 model = YOLO(model_path)
                 model.to(device)
                 self.models[model_name] = {

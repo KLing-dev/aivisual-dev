@@ -9,40 +9,46 @@ import sys
 import torch
 import os
 
-# 确保优先使用项目中的yolov12模块而不是site-packages中的
-project_yolov12_path = os.path.join(os.path.dirname(__file__), '..', '..', 'yolov12')
+# 确保使用项目中的yolov12模块
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+project_yolov12_path = os.path.join(project_root, 'yolov12')
+
+# 移除可能存在的其他ultralytics模块路径
+paths_to_remove = []
+for path in sys.path:
+    if 'ultralytics' in path and 'site-packages' in path:
+        paths_to_remove.append(path)
+
+for path in paths_to_remove:
+    sys.path.remove(path)
+    print(f"Removed path: {path}")
+
 if project_yolov12_path not in sys.path:
     sys.path.insert(0, project_yolov12_path)
+    print(f"Inserted project yolov12 path: {project_yolov12_path}")
 
+print("Current sys.path:")
+for p in sys.path:
+    print(f"  {p}")
+
+# 直接从项目本地的yolov12导入ultralytics
 try:
-    # 优先使用YOLOv12的ultralytics
     from ultralytics import YOLO
-    print("Successfully imported Ultralytics library from YOLOv12")
+    print("Successfully imported Ultralytics library from local YOLOv12")
+    import ultralytics
+    print(f"Ultralytics module path: {ultralytics.__file__}")
 except ImportError as e:
-    try:
-        # 如果失败，尝试使用系统安装的ultralytics
-        import sys
-        # 移除yolov12路径以避免冲突
-        yolov12_path = os.path.join(os.path.dirname(__file__), '..', '..', 'yolov12')
-        if yolov12_path in sys.path:
-            sys.path.remove(yolov12_path)
-        from ultralytics import YOLO
-        print("Successfully imported Ultralytics library from system")
-    except ImportError as e:
-        print("Error importing Ultralytics library:", e)
-        print("Please install required dependencies with: pip install ultralytics")
-        sys.exit(1)
+    print("Error importing Ultralytics library:", e)
+    sys.exit(1)
 
-# 尝试导入ByteTrack
-BYTETRACK_AVAILABLE = False
+# 从yolov12的ultralytics导入ByteTrack
 try:
-    # 从yolov12的ultralytics导入
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'yolov12'))
     from ultralytics.trackers.byte_tracker import BYTETracker
     BYTETRACK_AVAILABLE = True
-    print("Successfully imported ByteTrack tracker from ultralytics.trackers")
+    print("Successfully imported ByteTrack tracker from local ultralytics.trackers")
 except ImportError as e:
     print("ByteTrack not available:", str(e))
+    BYTETRACK_AVAILABLE = False
     print("Using basic tracking")
 
 # 定义Args类用于ByteTrack参数配置
@@ -58,13 +64,13 @@ class Args:
 
 
 class LoiteringDetector:
-    def __init__(self, model_path="yolov12/yolov12n.pt", loitering_time_threshold=20, target_classes=["person"],
-                 conf_threshold=0.5, img_size=640, device='cuda', detection_region=None, use_bytetrack=True):
+    def __init__(self, model_name="yolov12n.pt", loitering_time_threshold=20, target_classes=["person"],
+                 conf_threshold=0.3, img_size=640, device='cuda', detection_region=None, use_bytetrack=True):
         """
         初始化徘徊检测器
 
         Args:
-            model_path (str): YOLOv12模型路径
+            model_name (str): YOLOv12模型文件名
             loitering_time_threshold (int): 徘徊时间阈值（秒）
             target_classes (list): 要检测的目标类别列表
             conf_threshold (float): 置信度阈值
@@ -73,7 +79,7 @@ class LoiteringDetector:
             detection_region (tuple): 检测区域 (x, y, width, height) 或 None 表示全图检测
             use_bytetrack (bool): 是否使用ByteTrack跟踪器
         """
-        print(f"Loading YOLOv12 model from {model_path}...")
+        print(f"Loading YOLOv12 model: {model_name}...")
         try:
             # 检查设备可用性
             if device == 'cuda' and not torch.cuda.is_available():
@@ -83,9 +89,9 @@ class LoiteringDetector:
             print(f"Using device: {device}")
 
             # 使用 YOLOModelManager 加载模型
-            from api.models.yolo_models import YOLOModelManager
-            model_manager = YOLOModelManager(model_dir=os.path.dirname(model_path) or "yolov12")
-            self.model = model_manager.load_model(os.path.basename(model_path), device)
+            from ...models.yolo_models import YOLOModelManager
+            model_manager = YOLOModelManager()
+            self.model = model_manager.load_model(model_name, device)
             self.device = device
 
             # 设置检测类别
@@ -108,6 +114,12 @@ class LoiteringDetector:
         # 存储跟踪对象的信息
         self.tracked_objects = {}
         self.loitering_alarms = {}
+
+        # 用于控制告警频率的字典，记录每个对象上次发送告警的时间
+        self.last_alarm_times = {}
+
+        # 告警间隔时间（秒）
+        self.alarm_interval = 10  # 每10秒最多发送一次告警
 
         # 跟踪ID计数器
         self.next_object_id = 0
@@ -229,6 +241,31 @@ class LoiteringDetector:
             self.next_object_id += 1
             return new_id
 
+    def calculate_iou(self, box1, box2):
+        """
+        计算两个边界框的交并比(IoU)
+
+        Args:
+            box1, box2: 边界框坐标 [x1, y1, x2, y2]
+
+        Returns:
+            iou: 交并比
+        """
+        x1 = max(box1[0], box2[0])
+        y1 = max(box1[1], box2[1])
+        x2 = min(box1[2], box2[2])
+        y2 = min(box1[3], box2[3])
+
+        intersection_area = max(0, x2 - x1) * max(0, y2 - y1)
+
+        box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+        box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+
+        union_area = box1_area + box2_area - intersection_area
+
+        iou = intersection_area / union_area if union_area > 0 else 0
+        return iou
+
     def update_tracked_objects(self, detections, frame_time):
         """
         更新跟踪对象信息
@@ -238,6 +275,7 @@ class LoiteringDetector:
             frame_time: 当前帧时间
         """
         current_frame_objects = set()
+        current_alarms = {}
 
         # 处理当前帧的检测结果
         for detection in detections:
@@ -292,22 +330,41 @@ class LoiteringDetector:
                                 total_time = frame_time - first_seen_time
 
                                 if total_time > self.loitering_time_threshold and total_distance < 50:  # 50像素作为移动阈值
-                                    self.loitering_alarms[object_id] = {
-                                        'start_time': first_seen_time,
-                                        'current_time': frame_time,
-                                        'duration': total_time,
-                                        'position': box,
-                                        'class': class_name
-                                    }
+                                    # 检查是否应该发送告警（根据告警间隔时间）
+                                    should_send_alarm = True
+                                    current_time = frame_time
+                                    
+                                    if object_id in self.last_alarm_times:
+                                        time_since_last_alarm = current_time - self.last_alarm_times[object_id]
+                                        if time_since_last_alarm < self.alarm_interval:
+                                            should_send_alarm = False
+                                    
+                                    # 如果应该发送告警，则记录当前时间并添加到告警列表
+                                    if should_send_alarm:
+                                        self.last_alarm_times[object_id] = current_time
+                                        current_alarms[object_id] = {
+                                            'start_time': first_seen_time,
+                                            'current_time': frame_time,
+                                            'duration': total_time,
+                                            'position': box,
+                                            'class': class_name
+                                        }
                                 # 如果移动距离较大，且之前有警报，则移除警报
                                 elif total_distance >= 50 and object_id in self.loitering_alarms:
                                     del self.loitering_alarms[object_id]
 
-        # 移除不在当前帧中的对象的警报
-        removed_objects = set(self.loitering_alarms.keys()) - current_frame_objects
+        # 更新当前的告警列表
+        self.loitering_alarms = current_alarms
+
+        # 移除不在当前帧中的对象的相关信息
+        removed_objects = set(self.tracked_objects.keys()) - current_frame_objects
         for obj_id in removed_objects:
+            if obj_id in self.tracked_objects:
+                del self.tracked_objects[obj_id]
             if obj_id in self.loitering_alarms:
                 del self.loitering_alarms[obj_id]
+            if obj_id in self.last_alarm_times:
+                del self.last_alarm_times[obj_id]
 
     def detect_loitering(self, frame, frame_time):
         """
@@ -407,22 +464,40 @@ class LoiteringDetector:
             if dets:
                 # 使用ByteTrack跟踪
                 try:
-                    online_targets = self.tracker.update(np.array(dets), [h, w], [h, w])
+                    # 创建一个模拟的结果对象，使其与ultralytics的BYTETracker兼容
+                    class DetectionResults:
+                        def __init__(self, dets):
+                            # xyxy坐标 (x1, y1, x2, y2)
+                            self.xyxy = torch.tensor(np.array([det[:4] for det in dets]))
+                            # 置信度
+                            self.conf = torch.tensor(np.array([det[4] for det in dets]))
+                            # 类别
+                            self.cls = torch.zeros(len(dets))  # 假设所有都是同一类（如person）
+                            # xywh坐标 (中心点x, 中心点y, 宽度, 高度)
+                            boxes = self.xyxy
+                            self.xywh = torch.stack([
+                                (boxes[:, 0] + boxes[:, 2]) / 2,  # x center
+                                (boxes[:, 1] + boxes[:, 3]) / 2,  # y center
+                                boxes[:, 2] - boxes[:, 0],        # width
+                                boxes[:, 3] - boxes[:, 1]         # height
+                            ], dim=1)
+
+                    detection_results = DetectionResults(dets)
+                    online_targets = self.tracker.update(detection_results)
 
                     # 结合跟踪ID更新检测结果
-                    for t in online_targets:
-                        tlwh = t.tlwh
-                        tid = t.track_id
-                        vertical = tlwh[2] / tlwh[3] > 1.6
-                        if tlwh[2] * tlwh[3] > 10 and not vertical:
-                            x1, y1 = int(tlwh[0]), int(tlwh[1])
-                            x2, y2 = int(tlwh[0] + tlwh[2]), int(tlwh[1] + tlwh[3])
-                            # 添加跟踪ID到检测结果
-                            for i, det in enumerate(detections):
-                                det_coords = det[:4]
-                                if (abs(det_coords[0] - x1) < 5 and abs(det_coords[1] - y1) < 5 and
-                                    abs(det_coords[2] - x2) < 5 and abs(det_coords[3] - y2) < 5):
-                                    detections[i].append(tid)
+                    # 注意: online_targets 是一个numpy数组，不是STrack对象列表
+                    for target in online_targets:
+                        # target格式: [x1, y1, x2, y2, track_id, confidence, class, index]
+                        x1, y1, x2, y2 = map(int, target[:4])
+                        tid = int(target[4])
+
+                        # 添加跟踪ID到检测结果
+                        for i, det in enumerate(detections):
+                            det_coords = det[:4]
+                            if (abs(det_coords[0] - x1) < 5 and abs(det_coords[1] - y1) < 5 and
+                                abs(det_coords[2] - x2) < 5 and abs(det_coords[3] - y2) < 5):
+                                detections[i].append(tid)
                 except Exception as e:
                     print(f"Error in ByteTrack update: {e}")
 

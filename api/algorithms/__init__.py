@@ -1,13 +1,17 @@
-from .loitering_detection import LoiteringDetector
-from .leave_detection import LeaveDetector
-from .gather_detection import GatherDetector
-from .banner_detection import BannerDetector
-from .video_processor import VideoProcessor
+"""
+算法模块初始化文件
+"""
+
+from .loitering import LoiteringDetector
+from .leave import LeaveDetector
+from .gather import GatherDetector
+from .banner import BannerDetector
+from .coordinator import VideoProcessingCoordinator
 
 __all__ = [
-    'LoiteringDetector',
-    'LeaveDetector',
-    'GatherDetector',
-    'BannerDetector',
-    'VideoProcessor'
+    "LoiteringDetector",
+    "LeaveDetector",
+    "GatherDetector",
+    "BannerDetector",
+    "VideoProcessingCoordinator"
 ]
