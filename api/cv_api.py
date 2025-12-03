@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routes.file_routes import router as file_router
 from .routes.task_routes import router as task_router
 from .routes.camera_routes import router as camera_router
-from .routes.ga1400_routes import router as ga1400_router
 from .routes.alarm_routes import router as alarm_router
 from .utils.ascii import ascii_art as draw
 # 初始化 FastAPI 应用
@@ -24,7 +23,6 @@ app.add_middleware(
 app.include_router(file_router)
 app.include_router(task_router)
 app.include_router(camera_router)
-app.include_router(ga1400_router)
 app.include_router(alarm_router)
 
 
