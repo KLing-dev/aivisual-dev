@@ -30,7 +30,6 @@ project/
 │   └── cv_api.py            # FastAPI 主服务
 ├── yolov12/                 # YOLOv12 模型文件和YOLO主函数
 ├── Dockerfile.backend       # 后端 Docker 配置
-├── Dockerfile.frontend      # 前端 Docker 配置
 ├── docker-compose.yml       # Docker 容器编排配置
 └── requirements.txt         # Python 依赖
 ```
@@ -40,7 +39,7 @@ git clone https://github.com/Marcheursc/aivisual.git
 # 在项目根目录下运行：
 pip install pre-commit
 pre-commit install
-pre-commit run --all-files
+pre-commit run
 ```
 
 ## 安装依赖
